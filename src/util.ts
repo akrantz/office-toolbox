@@ -64,6 +64,11 @@ export function list(): Promise<Array<[string, string, string]>> {
   return getAllIdsAndManifests();
 }
 
+export function register(application: string, manifestPath: string): Promise<any> {
+  appInsights.trackEvent('register');
+  return registerManifest(application, manifestPath);
+}
+
 export function remove(application: string, manifestPath: string): Promise<any> {
   appInsights.trackEvent('remove');
   return removeManifest(application, manifestPath);
@@ -270,7 +275,7 @@ function isGuid (text: string): boolean {
   return guidRegex.test(text);
 }
 
-function sideloadManifest(application: string, manifestPath: string): Promise<any> {
+function registerManifest(application: string, manifestPath: string): Promise<any> {
   return new Promise(async (resolve, reject) => {
     try {
       if (fs.existsSync(manifestPath) && fs.lstatSync(manifestPath).isFile()) {
@@ -280,13 +285,36 @@ function sideloadManifest(application: string, manifestPath: string): Promise<an
         return reject(['The manifest to sideload could not be found: ', manifestPath]);
       }
 
-      try {
-        const result = await validateManifest(manifestPath);
-        if (result !== 'Passed') {
-          throw result;
+      const [parsedType, parsedGuid, parsedVersion] = await parseManifest(manifestPath);
+      await addManifest(application, manifestPath);
+
+      resolve();
+    }
+    catch (err) {
+      return reject(err);
+    }
+  });
+}
+
+function sideloadManifest(application: string, manifestPath: string, needToValidate: boolean = false): Promise<any> {
+  return new Promise(async (resolve, reject) => {
+    try {
+      if (fs.existsSync(manifestPath) && fs.lstatSync(manifestPath).isFile()) {
+        manifestPath = fs.realpathSync(manifestPath);
+      }
+      else {
+        return reject(['The manifest to sideload could not be found: ', manifestPath]);
+      }
+
+      if (needToValidate) {
+        try {
+          const result = await validateManifest(manifestPath);
+          if (result !== 'Passed') {
+            throw result;
+          }
+        } catch (err) {
+          console.log(chalk.red('Manifest validation was not successful. It may not be possible to sideload this manifest, but we\'ll try anyways...'));
         }
-      } catch (err) {
-        console.log(chalk.red('Manifest validation was not successful. It may not be possible to sideload this manifest, but we\'ll try anyways...'));
       }
 
       const [parsedType, parsedGuid, parsedVersion] = await parseManifest(manifestPath);

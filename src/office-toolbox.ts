@@ -35,7 +35,7 @@ async function promptForCommand() {
     type: 'list',
     message: 'What do you want to do?',
     choices: ['List registered developer manifests',
-              'Sideload a manifest',
+              'Register a manifest',
               'Remove a manifest',
               'Validate a manifest',
               'Generate a manifest']
@@ -46,7 +46,7 @@ async function promptForCommand() {
         list();
         break;
       case 1:
-        sideload(null, null);
+        register(null, null);
         break;
       case 2:
         remove(null, null);
@@ -224,6 +224,20 @@ async function list() {
   }
 }
 
+async function register(application: string, manifestPath: string) {
+  try {
+    if (!application || Object.keys(util.applicationProperties).indexOf(application) < 0) {
+      console.log('A valid application must be specified.');
+      application = await promptForApplication();
+    }
+
+    manifestPath = await checkAndPromptForPath(application, manifestPath);
+    await util.register(application, manifestPath);
+  } catch (err) {
+    logRejection(err);
+  }
+}
+
 async function sideload(application: string, manifestPath: string) {
   try {
     if (!application || Object.keys(util.applicationProperties).indexOf(application) < 0) {
@@ -298,6 +312,15 @@ commander
   });
 
 commander
+  .command('register')
+  .option('-a, --application <application>', 'The Office application. Word, Excel, and PowerPoint are currently supported.')
+  .option('-m, --manifest_path <manifest_path>', 'The path of the manifest file to register.')
+  .action(async (options) => {
+    let application = (!options.application ? null : options.application.toLowerCase());
+    register(application, options.manifest_path);
+  });
+
+  commander
   .command('sideload')
   .option('-a, --application <application>', 'The Office application. Word, Excel, and PowerPoint are currently supported.')
   .option('-m, --manifest_path <manifest_path>', 'The path of the manifest file to sideload and launch.')
